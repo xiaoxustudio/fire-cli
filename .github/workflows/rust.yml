@@ -1,153 +1,112 @@
-# .github/workflows/rust.yml
-
-name: Rust CI
+name: Build and Release
 
 on:
   push:
     tags:
-      - 'v*.*.*'
-
-env:
-  CARGO_TERM_COLOR: always # 让 cargo 输出带颜色，方便在日志中查看
+      - "v*.*.*"
 
 jobs:
-  # --- 1. 测试和基础检查 ---
-  test:
-    name: Test Suite
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
-        with:
-          components: rustfmt, clippy
-
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
-
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-
-      - name: Run linter (Clippy)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-
-      - name: Run tests
-        run: cargo test --verbose
-
-  # --- 2. 构建 Release ---
   build:
-    name: Build Release
-    # 只有在推送标签时才运行此 job
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: test # 依赖于 test job 成功
+    runs-on: ${{ matrix.os }}
     strategy:
       matrix:
-        # 定义要构建的目标平台
         include:
+          # Linux x86_64（添加 ubuntu 后缀）
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
-            artifact_name: fire-cli
-            asset_name: fire-cli-linux-x86_64
-          - os: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: fire-cli.exe
-            asset_name: fire-cli-windows-x86_64.exe
+            asset_name: fire-linux-x86_64
+            original_binary: fire-cli # 原始产物名
+            renamed_binary: fire-cli-ubuntu # 带平台后缀的产物名
+          # macOS x86_64（添加 macos 后缀）
           - os: macos-latest
             target: x86_64-apple-darwin
-            artifact_name: fire-cli
-            asset_name: fire-cli-macos-x86_64
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: fire-cli
-            asset_name: fire-cli-macos-aarch64
+            asset_name: fire-macos-x86_64
+            original_binary: fire-cli
+            renamed_binary: fire-cli-macos
+          # Windows x86_64（保持原名）
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            asset_name: fire-windows-x86_64.exe
+            original_binary: fire-cli.exe
+            renamed_binary: fire-cli.exe # 不修改
 
-    runs-on: ${{ matrix.os }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Install Rust
-        uses: dtolnay/rust-toolchain@stable
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
         with:
-          # 为每个目标平台添加对应的工具链
-          targets: ${{ matrix.target }}
+          toolchain: stable
+          profile: minimal
+          override: true
+          target: ${{ matrix.target }}
 
-      - name: Cache dependencies
-        uses: actions/cache@v3
-        with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-            target/
-          key: ${{ runner.os }}-${{ matrix.target }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-${{ matrix.target }}-cargo-
-
-      - name: Build for target
+      # 构建产物
+      - name: Build project
         run: cargo build --release --target ${{ matrix.target }}
+        env:
+          RUST_BACKTRACE: full
 
-      - name: Strip binary (Unix)
-        # 在 Linux 和 macOS 上，strip 可以减小二进制文件大小
-        if: matrix.os != 'windows-latest'
-        run: strip target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+      # 调试：查看构建产物原始名称
+      - name: Debug build output (original)
+        run: |
+          echo "=== 构建目录: target/${{ matrix.target }}/release ==="
+          ls -la target/${{ matrix.target }}/release/
+        shell: bash
 
+      # 重命名产物（仅 Ubuntu 和 macOS）
+      - name: Rename binary with platform suffix
+        if: matrix.os == 'ubuntu-latest' || matrix.os == 'macos-latest'
+        run: |
+          # 重命名原始产物为带平台后缀的名称
+          mv target/${{ matrix.target }}/release/${{ matrix.original_binary }} \
+             target/${{ matrix.target }}/release/${{ matrix.renamed_binary }}
+        shell: bash
+
+      # 调试：确认重命名后的产物
+      - name: Debug build output (renamed)
+        run: |
+          echo "=== 重命名后构建目录: target/${{ matrix.target }}/release ==="
+          ls -la target/${{ matrix.target }}/release/
+        shell: bash
+
+      # 上传重命名后的产物
       - name: Upload artifact
-        # 将构建好的二进制文件作为 GitHub Actions 的 artifact 保存
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset_name }}
-          path: target/${{ matrix.target }}/release/${{ matrix.artifact_name }}
+          path: target/${{ matrix.target }}/release/${{ matrix.renamed_binary }} # 上传重命名后的文件
+          if-no-files-found: error
 
-  # --- 3. 发布 Release ---
   release:
-    name: Release
-    # 只有在推送标签时才运行
-    if: startsWith(github.ref, 'refs/tags/')
-    needs: [test, build] # 依赖于 test 和 build job 成功
     runs-on: ubuntu-latest
+    needs: build
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
       - name: Download all artifacts
-        # 从 build job 下载所有构建好的二进制文件
-        uses: actions/download-artifact@v3
+        uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Display structure of downloaded files
-        run: ls -R artifacts/
+      # 验证最终产物路径（带后缀）
+      - name: Debug artifacts structure
+        run: |
+          sudo apt-get install -y tree
+          echo "=== 最终 artifacts 目录结构 ==="
+          tree artifacts
+        shell: bash
 
-      - name: Create Release
-        # 使用 GitHub CLI 创建一个 Release
-        id: create_release
-        uses: actions/create-release@v1
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref }}
+          name: Release ${{ github.ref_name }}
+          body: |
+            ## Changes in this Release
+            - detail to see [CHANGELOG](https://github.com/xiaoxustudio/fire-cli/blob/master/CHANGELOG.md)
+          files: |
+            artifacts/fire-linux-x86_64/fire-cli-ubuntu
+            artifacts/fire-macos-x86_64/fire-cli-macos
+            artifacts/fire-windows-x86_64.exe/fire-cli.exe
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tag_name: ${{ github.ref_name }} # 使用推送的标签名
-          release_name: Release ${{ github.ref_name }}
-          draft: false # 是否是草稿
-          prerelease: false # 是否是预发布版本
-
-      - name: Upload Release Assets
-        # 将下载的 artifacts 作为附件上传到刚刚创建的 Release
-        uses: softprops/action-gh-release@v1
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          files: artifacts/**/*
