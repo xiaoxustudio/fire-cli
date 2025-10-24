@@ -81,16 +81,13 @@ fn show_file_info(entry: &DirEntry) {
 pub fn handle_command(file_commands: &FileCommands) {
     match file_commands {
         FileCommands::List { target_path } => {
-            // 解析路径（处理默认路径和错误）
             let target = match resolve_path(target_path) {
                 Ok(path) => path,
                 Err(_) => return,
             };
 
-            // 打印表头（无论是否有路径都显示）
             println!("{: <20} {: <20}", "名称", "大小");
 
-            // 安全读取目录（避免 panic）
             let entries = match fs::read_dir(&target) {
                 Ok(entries) => entries,
                 Err(err) => {
@@ -99,16 +96,13 @@ pub fn handle_command(file_commands: &FileCommands) {
                 }
             };
 
-            // 分离目录和文件，先显示目录再显示文件
             let (dirs, files): (Vec<DirEntry>, Vec<DirEntry>) = entries
                 .filter_map(Result::ok) // 过滤掉读取失败的条目
                 .partition(|entry| entry.file_type().map_or(false, |ft| ft.is_dir()));
 
-            // 显示目录
             for entry in dirs {
                 show_file_info(&entry);
             }
-            // 显示文件
             for entry in files {
                 show_file_info(&entry);
             }
@@ -120,7 +114,6 @@ pub fn handle_command(file_commands: &FileCommands) {
                 Err(_) => return,
             };
 
-            // 调用系统默认程序打开文件/目录
             if let Err(err) = opener::open(&target) {
                 log::error(&format!("打开失败: {}", err));
             } else {
@@ -134,7 +127,6 @@ pub fn handle_command(file_commands: &FileCommands) {
                 Err(_) => return,
             };
 
-            // 区分文件和目录，分别处理删除
             if target.is_file() {
                 if let Err(err) = fs::remove_file(&target) {
                     log::error(&format!("删除文件失败: {}", err));
@@ -153,7 +145,6 @@ pub fn handle_command(file_commands: &FileCommands) {
         }
 
         FileCommands::Rename { path, target_path } => {
-            // 解析源路径和目标路径
             let source = match resolve_path(&Some(path.clone())) {
                 Ok(p) => p,
                 Err(_) => return,
@@ -163,7 +154,6 @@ pub fn handle_command(file_commands: &FileCommands) {
                 Err(_) => return,
             };
 
-            // 执行重命名
             if let Err(err) = fs::rename(&source, &dest) {
                 log::error(&format!("重命名失败: {}", err));
             } else {
@@ -176,7 +166,6 @@ pub fn handle_command(file_commands: &FileCommands) {
         }
 
         FileCommands::Write { path } => {
-            // 安全创建文件（避免 panic）
             let mut file = match fs::File::create(path) {
                 Ok(f) => f,
                 Err(err) => {
@@ -190,26 +179,23 @@ pub fn handle_command(file_commands: &FileCommands) {
             let mut lines_iter = stdin.lock().lines();
 
             let mut input = String::new();
-            let mut consecutive_empty = 0; // 连续空行计数器
+            let mut consecutive_empty = 0;
 
             while let Some(Ok(line)) = lines_iter.next() {
                 if line.trim().is_empty() {
                     consecutive_empty += 1;
-                    // 连续两次空行则结束
                     if consecutive_empty >= 2 {
                         log::info("检测到连续空行，结束写入");
                         break;
                     }
-                    // 第一次空行仍写入（保留空行）
                     input.push('\n');
                 } else {
-                    consecutive_empty = 0; // 非空行重置计数器
+                    consecutive_empty = 0;
                     input.push_str(&line);
-                    input.push('\n'); // 补充换行符
+                    input.push('\n');
                 }
             }
 
-            // 写入文件
             if let Err(err) = file.write_all(input.as_bytes()) {
                 log::error(&format!("写入文件失败: {}", err));
             } else {

@@ -4,12 +4,11 @@ mod link;
 mod log;
 mod util;
 
-use clap::{Parser, Subcommand}; // 导入必要 trait
+use clap::{Parser, Subcommand};
 use file::FileCommands;
 use link::LinkCommands;
 
-/// 一级子命令枚举（包含所有顶层子命令）
-#[derive(Subcommand, Debug)] // 派生 Subcommand
+#[derive(Subcommand, Debug)]
 enum Commands {
     /// 文件相关命令
     #[command(subcommand)]
@@ -19,13 +18,12 @@ enum Commands {
     Link(LinkCommands),
 }
 
-/// 根命令
 #[derive(Parser, Debug)]
 #[command(name = "fire-cli")]
 #[command(about = "一个简单的实用工具", long_about = None, version)]
 struct Cli {
-    #[command(subcommand)] // 标记为子命令字段
-    command: Commands, // 类型为一级子命令枚举
+    #[command(subcommand)]
+    command: Commands,
 }
 
 fn main() {
