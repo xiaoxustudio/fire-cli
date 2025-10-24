@@ -1,5 +1,6 @@
 use std::{
     fs::DirEntry,
+    io::{self, BufRead, Write},
     path::{Path, PathBuf},
 };
 
@@ -37,6 +38,12 @@ pub enum FileCommands {
         path: String,
         /// 重命名后的文件名
         target_path: String,
+    },
+    /// 写入文件(回车2次结束写入)
+    #[command(name = "write", alias = "wr")]
+    Write {
+        /// 写入文件路径
+        path: String,
     },
 }
 
@@ -118,6 +125,27 @@ pub fn handle_command(file_commands: &FileCommands) {
                 log::error(&format!("Failed to rename file: {}", err));
             } else {
                 log::success("File renamed");
+            }
+        }
+        FileCommands::Write { path } => {
+            let mut file = std::fs::File::create(path).expect("Failed to create file");
+
+            let stdin = io::stdin();
+            let mut lines_iter = stdin.lock().lines();
+
+            let mut input = String::new();
+            while let Some(Ok(line)) = lines_iter.next() {
+                if line.trim().is_empty() {
+                    log::info("Empty line detected, file writing finished");
+                    break;
+                }
+                input.push_str(&line);
+                input.push('\n');
+            }
+            if let Err(err) = file.write(input.as_bytes()) {
+                log::error(&format!("Failed to write file: {}", err));
+            } else {
+                log::success("File written");
             }
         }
     }
