@@ -1,4 +1,7 @@
-use std::path::{Path, PathBuf};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+};
 
 use crate::log;
 
@@ -11,4 +14,16 @@ pub fn resolve_path(path_opt: &Option<String>) -> Result<PathBuf, String> {
         log::error(&msg);
         msg
     })
+}
+
+pub fn write_file<P: AsRef<Path>, C: AsRef<[u8]>>(path: P, content: C) -> std::io::Result<()> {
+    let path = path.as_ref();
+
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)?;
+    }
+
+    fs::write(path, content)?;
+
+    Ok(())
 }

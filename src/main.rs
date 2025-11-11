@@ -1,7 +1,8 @@
-// main.rs
 mod file;
 mod link;
 mod log;
+mod open;
+mod store;
 mod util;
 
 use clap::{Parser, Subcommand};
@@ -16,6 +17,9 @@ enum Commands {
     /// 链接相关命令
     #[command(subcommand)]
     Link(LinkCommands),
+    /// 打开相关命令
+    #[command(name = "open", alias = "o")]
+    Open { target: String },
 }
 
 #[derive(Parser, Debug)]
@@ -31,5 +35,6 @@ fn main() {
     match &cli.command {
         Commands::File(file_cmd) => file::handle_command(file_cmd),
         Commands::Link(link_cmd) => link::handle_command(link_cmd),
+        Commands::Open { target } => open::link::handle_coommand(target),
     }
 }
