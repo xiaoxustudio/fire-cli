@@ -15,6 +15,8 @@ pub enum LinkCommands {
         #[arg( num_args(0..=1))]
         target_path: Option<String>,
     },
+    /// 移除链接
+    Remove { name: String },
     /// 显示链接
     Show { name: String },
 }
@@ -53,6 +55,19 @@ pub fn handle_command(link_commands: &LinkCommands) {
             set_store("list", list.clone());
 
             log::success(&format!("创建链接: {} -> {}", name, target.display()));
+        }
+        LinkCommands::Remove { name } => {
+            let mut list = get_store("list");
+            let is_insided = list.as_object().iter().any(|key| key.contains_key(name));
+            if !is_insided {
+                log::error(&format!("链接不存在: {}", name));
+                return;
+            }
+            // 移除链接
+            let obj = list.as_object_mut().unwrap();
+            obj.remove(name);
+            set_store("list", serde_json::Value::Object(obj.clone()));
+            log::success(&format!("移除链接: {}", name));
         }
         LinkCommands::Show { name } => {
             let list = get_store("list");

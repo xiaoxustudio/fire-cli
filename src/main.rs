@@ -25,6 +25,7 @@ enum Commands {
 #[derive(Parser, Debug)]
 #[command(name = "fire-cli")]
 #[command(about = "一个简单的实用工具", long_about = None, version)]
+#[command(author = "xuran")]
 struct Cli {
     #[command(subcommand)]
     command: Commands,
