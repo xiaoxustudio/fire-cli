@@ -45,7 +45,7 @@ Options:
 ```
 
 # link
-
+可以使用`link`命令创建一个快捷方式，方便快速打开文件或目录。
 ```bash
 > fire-cli link --help
 
@@ -64,7 +64,7 @@ Options:
 ```
 
 # open
-
+通过`open`命令可以快速打开文件或目录，也可以打开使用`link`指令创建的链接。
 ```bash
 > fire-cli open --help
 
