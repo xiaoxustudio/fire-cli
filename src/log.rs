@@ -21,3 +21,9 @@ pub fn warn(message: &str) {
 pub fn info(message: &str) {
     println!("{} {}", "[INFO]".blue().bold(), message);
 }
+
+#[allow(dead_code)]
+/// 打印带有前缀的普通信息（蓝色）
+pub fn info_prefix(prefix: &str, message: &str) {
+    println!("{} {}", format!("[{}] ", prefix).purple().bold(), message);
+}

@@ -22,7 +22,10 @@ enum Commands {
     Link(LinkCommands),
     /// 打开相关命令
     #[command(name = "open", alias = "o")]
-    Open { target: String },
+    Open {
+        #[arg(short, long, help = "要打开的文件路径、URL、关键字")]
+        target: String,
+    },
     /// 将应用程序更新至最新版本
     Update,
 }

@@ -19,6 +19,8 @@ pub enum LinkCommands {
     Remove { name: String },
     /// 显示链接
     Show { name: String },
+    /// 显示已创建的链接
+    List,
 }
 
 pub fn handle_command(link_commands: &LinkCommands) {
@@ -76,6 +78,14 @@ pub fn handle_command(link_commands: &LinkCommands) {
                 return;
             }
             log::error(&format!("链接不存在: {}", name));
+        }
+        LinkCommands::List => {
+            let list = get_store("list");
+            if let Some(obj) = list.as_object() {
+                for (name, target) in obj {
+                    log::info_prefix("LL", &format!("{} -> {}", name, target.as_str().unwrap()));
+                }
+            }
         }
     }
 }
